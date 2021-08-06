@@ -14,7 +14,7 @@ class Preprocessor:
         self.shape = shape
         self.color_mode = color_mode
         self.preprocessing_function = preprocessing_function
-        self.validation_split = config.VAL_SPLIT
+#         self.validation_split = config.VAL_SPLIT
 
         self.nb_val_images = None
         self.nb_test_images = None
@@ -141,6 +141,12 @@ class Preprocessor:
             number = len(filenames)
             total_number = total_number + number
         return total_number
+    
+    def preprocess_image(self, img):
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        resize_img = cv2.resize(gray, (self.shape[0], self.shape[1]) , interpolation = cv2.INTER_AREA)
+        resize_img = resize_img.reshape(1,self.shape[0],self.shape[1],1 ) 
+        return resize_img/255.0
 
 
 def get_preprocessing_function(architecture):
