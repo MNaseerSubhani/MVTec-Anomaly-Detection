@@ -3,6 +3,10 @@ Model inspired by: https://github.com/natasasdj/anomalyDetection
 """
 
 import tensorflow as tf
+import cv2
+from matplotlib import pyplot as plt
+import os
+import numpy as np
 from tensorflow.keras.layers import (
     Input,
     Dense,
@@ -11,20 +15,31 @@ from tensorflow.keras.layers import (
     UpSampling2D,
     BatchNormalization,
     GlobalAveragePooling2D,
+    Normalization,
     LeakyReLU,
     Activation,
     concatenate,
     Flatten,
     Reshape,
+    Add,
 )
 from tensorflow.keras.models import Model
 from tensorflow.keras import regularizers
-
+SHAPE = (512, 512)
 
 # Preprocessing parameters
 RESCALE = 1.0 / 255
-SHAPE = (256, 256)
-PREPROCESSING_FUNCTION = None
+blur_value = 3
+kernel = np.ones((blur_value,blur_value),np.float32)/(blur_value*blur_value)
+kernel_1 = np.ones((5, 5), np.uint8)
+def Input_Process(img):
+  img = img.reshape(SHAPE)
+  gray_b = cv2.filter2D(img,-1,kernel)
+  
+  return gray_b.reshape(*SHAPE, 1)
+  
+
+PREPROCESSING_FUNCTION = Input_Process
 PREPROCESSING = None
 VMIN = 0.0
 VMAX = 1.0
@@ -41,11 +56,12 @@ def build_model(color_mode):
 
     # input
     input_img = Input(shape=img_dim)
-
+    # x = Normalization(mean=0.39732972826936414, variance=0.010313226193989894)(input_img)
     # encoder
+    x = BatchNormalization()(input_img)
     encoding_dim = 64  # 128
-    x = Conv2D(32, (3, 3), padding="same", kernel_regularizer=regularizers.l2(1e-6))(
-        input_img
+    x = Conv2D(16, (3, 3), padding="same", kernel_regularizer=regularizers.l2(1e-6))(
+        x
     )
     x = BatchNormalization()(x)
     x = LeakyReLU(alpha=0.1)(x)
@@ -56,24 +72,30 @@ def build_model(color_mode):
     x = BatchNormalization()(x)
     x = LeakyReLU(alpha=0.1)(x)
     x = MaxPooling2D((2, 2), padding="same")(x)
+    
     # ---------------------------------------------------------------------------------
 
     x = Conv2D(64, (3, 3), padding="same", kernel_regularizer=regularizers.l2(1e-6))(x)
     x = BatchNormalization()(x)
     x = LeakyReLU(alpha=0.1)(x)
     x = MaxPooling2D((2, 2), padding="same")(x)
+
+    
 
     # added ---------------------------------------------------------------------------
     x = Conv2D(64, (3, 3), padding="same", kernel_regularizer=regularizers.l2(1e-6))(x)
     x = BatchNormalization()(x)
     x = LeakyReLU(alpha=0.1)(x)
     x = MaxPooling2D((2, 2), padding="same")(x)
+    
+    
     # ---------------------------------------------------------------------------------
 
     x = Conv2D(128, (3, 3), padding="same", kernel_regularizer=regularizers.l2(1e-6))(x)
     x = BatchNormalization()(x)
     x = LeakyReLU(alpha=0.1)(x)
     x = MaxPooling2D((2, 2), padding="same")(x)
+    t = x
 
     # added ---------------------------------------------------------------------------
     x = Conv2D(128, (3, 3), padding="same", kernel_regularizer=regularizers.l2(1e-6))(x)
@@ -93,18 +115,22 @@ def build_model(color_mode):
     x = BatchNormalization()(x)
     x = LeakyReLU(alpha=0.1)(x)
     x = UpSampling2D((2, 2))(x)
+    
 
     ## added ---------------------------------------------------------------------------
     x = Conv2D(128, (3, 3), padding="same", kernel_regularizer=regularizers.l2(1e-6))(x)
     x = BatchNormalization()(x)
     x = LeakyReLU(alpha=0.1)(x)
     x = UpSampling2D((2, 2))(x)
+    x = Add()([x, t])
+    
     # ---------------------------------------------------------------------------------
 
     x = Conv2D(64, (3, 3), padding="same", kernel_regularizer=regularizers.l2(1e-6))(x)
     x = BatchNormalization()(x)
     x = LeakyReLU(alpha=0.1)(x)
     x = UpSampling2D((2, 2))(x)
+    
 
     ## added ---------------------------------------------------------------------------
     x = Conv2D(64, (3, 3), padding="same", kernel_regularizer=regularizers.l2(1e-6))(x)
@@ -123,6 +149,13 @@ def build_model(color_mode):
     x = BatchNormalization()(x)
     x = LeakyReLU(alpha=0.1)(x)
     x = UpSampling2D((2, 2))(x)
+
+    x = Conv2D(32, (3, 3), padding="same", kernel_regularizer=regularizers.l2(1e-6))(x)
+    x = BatchNormalization()(x)
+    x = LeakyReLU(alpha=0.1)(x)
+    x = UpSampling2D((2, 2))(x)
+
+ 
     # ---------------------------------------------------------------------------------
 
     x = Conv2D(

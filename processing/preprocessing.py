@@ -1,6 +1,22 @@
 import os
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import config
+import cv2
+import numpy as np
+
+
+SHAPE = (512,512)
+blur_value = 3
+kernel = np.ones((blur_value,blur_value),np.float32)/(blur_value*blur_value)
+kernel_1 = np.ones((30, 30), np.uint8)
+def Input_Process(img):
+  img = img.reshape(*SHAPE)
+  img = cv2.filter2D(img,-1,kernel)
+  # n_map = np.where(gray_b > 162 ,1.0,0)
+  # n_map = cv2.morphologyEx(n_map, cv2.MORPH_CLOSE, kernel_1)
+  
+  return img.reshape(*SHAPE, 1)
+  
 
 
 class Preprocessor:
@@ -14,8 +30,12 @@ class Preprocessor:
         self.shape = shape
         self.color_mode = color_mode
         self.preprocessing_function = preprocessing_function
-#         self.validation_split = config.VAL_SPLIT
+        self.validation_split = config.VAL_SPLIT
 
+        self.img_shp = 512
+        self.cnt = int(self.img_shp/2)
+        self.glb_mask = cv2.circle(np.zeros((self.img_shp, self.img_shp)), (self.cnt, self.cnt), self.cnt , (1,1,1), -1) 
+        self.glb_mask = np.array(self.glb_mask, dtype = 'uint8')
         self.nb_val_images = None
         self.nb_test_images = None
 
@@ -58,6 +78,8 @@ class Preprocessor:
             shuffle=True,
         )
         return train_generator
+    
+    
 
     def get_val_generator(self, batch_size, shuffle=True):
         """
@@ -107,6 +129,20 @@ class Preprocessor:
             shuffle=shuffle,
         )
         return test_generator
+    
+    def get_test_image(self, img_pth):
+        img = cv2.imread(img_pth)
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        resize_img = cv2.resize(gray, (self.shape[0], self.shape[1]) , interpolation = cv2.INTER_AREA)
+        
+        resize_img = cv2.bitwise_and(resize_img, resize_img, mask=self.glb_mask)
+        #resize_img = Input_Process(resize_img)
+        resize_img = resize_img.reshape(1,self.shape[0],self.shape[1],1 ) 
+
+        return resize_img/255.0
+      
+
+
 
     def get_finetuning_generator(self, batch_size, shuffle=False):
         """
@@ -141,15 +177,9 @@ class Preprocessor:
             number = len(filenames)
             total_number = total_number + number
         return total_number
-    
-    def preprocess_image(self, img):
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        resize_img = cv2.resize(gray, (self.shape[0], self.shape[1]) , interpolation = cv2.INTER_AREA)
-        resize_img = resize_img.reshape(1,self.shape[0],self.shape[1],1 ) 
-        return resize_img/255.0
 
 
 def get_preprocessing_function(architecture):
-    if architecture in ["mvtecCAE", "baselineCAE", "indexptionCAE", "resnetCAE"]:
+    if architecture in ["mvtecCAE", "baselineCAE", "baselineCAE_fast", "indexptionCAE", "resnetCAE", "skipCAE"]:
         preprocessing_function = None
     return preprocessing_function

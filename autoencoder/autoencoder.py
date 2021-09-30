@@ -22,6 +22,7 @@ from autoencoder.models import baselineCAE
 from autoencoder.models import inceptionCAE
 from autoencoder.models import resnetCAE
 from autoencoder.models import skipCAE
+from autoencoder.models import baselineCAE_fast
 from autoencoder import metrics
 from autoencoder import losses
 
@@ -94,6 +95,16 @@ class AutoEncoder:
             self.vmin = baselineCAE.VMIN
             self.vmax = baselineCAE.VMAX
             self.dynamic_range = baselineCAE.DYNAMIC_RANGE
+        elif architecture == "baselineCAE_fast":
+            # Preprocessing parameters
+            self.model = baselineCAE_fast.build_model(color_mode)
+            self.rescale = baselineCAE_fast.RESCALE
+            self.shape = baselineCAE_fast.SHAPE
+            self.preprocessing_function = baselineCAE_fast.PREPROCESSING_FUNCTION
+            self.preprocessing = baselineCAE_fast.PREPROCESSING
+            self.vmin = baselineCAE_fast.VMIN
+            self.vmax = baselineCAE_fast.VMAX
+            self.dynamic_range = baselineCAE_fast.DYNAMIC_RANGE
 
         elif architecture == "inceptionCAE":
             # Preprocessing parameters
@@ -253,9 +264,9 @@ class AutoEncoder:
 
         # fit model using Cyclical Learning Rates
         self.hist = self.learner.autofit(
-            lr=lr_opt,
-            epochs=None,
-            early_stopping=self.early_stopping,
+            lr=0.001,
+            epochs=500,
+            
             reduce_on_plateau=self.reduce_on_plateau,
             reduce_factor=2,
             cycle_momentum=True,
@@ -300,7 +311,9 @@ class AutoEncoder:
 
     def save(self):
         # save model
+        
         self.model.save(os.path.join(self.save_dir, self.create_model_name()))
+        self.model.save(os.path.join(self.save_dir, 'ad_model.h5'))
         # save trainnig info
         info = self.get_info()
         with open(os.path.join(self.save_dir, "info.json"), "w") as json_file:
