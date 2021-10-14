@@ -18,7 +18,7 @@ SHAPE = (512, 512)
 #   img = img.reshape(SHAPE)
 #   img -= np.mean(img)
 #   return img.reshape(*SHAPE, 1)
-blur_value = 2
+blur_value = 7
 kernel = np.ones((blur_value,blur_value),np.float32)/(blur_value*blur_value)
 kernel_1 = np.ones((30, 30), np.uint8)
 
@@ -33,6 +33,15 @@ def augmentation(img):
         
     if(bool(random.getrandbits(1))):
         img = cv2.flip(img, 0)
+
+    if(bool(random.getrandbits(1))):
+        x = random.randint(0, 256)
+        y = random.randint(0, 256)
+
+        img = img[y: y + 256, x: x + 256]
+        img = cv2.resize(img, SHAPE, interpolation = cv2.INTER_AREA)
+        
+    
     
     img = img/255.00
 
@@ -41,6 +50,7 @@ def augmentation(img):
 	
 def Input_Process(img):
   img = img.reshape(SHAPE)
+  img = cv2.filter2D(img,-1,kernel)
   #img = np.where(img == 0, random.randint(0,255)/255, img)
   img = augmentation(img)
   # n_map = np.where(gray_b > 162 ,1.0,0)
@@ -53,7 +63,7 @@ VMIN = 0.0
 VMAX = 1.0
 DYNAMIC_RANGE = VMAX - VMIN
 
-
+mul_th = 2
 def build_model(color_mode):
     # set channels
     if color_mode == "grayscale":
@@ -64,42 +74,42 @@ def build_model(color_mode):
     # define model
     input_img = keras.layers.Input(shape=(*SHAPE, channels))
     # Encode-----------------------------------------------------------
-    x = keras.layers.Conv2D(16, (4, 4), strides=2, activation="relu", padding="same")(
+    x = keras.layers.Conv2D(16 * mul_th, (4, 4), strides=2, activation="relu", padding="same")(
         input_img
     )
-    x = keras.layers.Conv2D(16, (4, 4), strides=2, activation="relu", padding="same")(x)
-    x = keras.layers.Conv2D(16, (4, 4), strides=2, activation="relu", padding="same")(x)
-    x = keras.layers.Conv2D(16, (3, 3), strides=1, activation="relu", padding="same")(x)
-    x = keras.layers.Conv2D(32, (4, 4), strides=2, activation="relu", padding="same")(x)
-    x = keras.layers.Conv2D(32, (3, 3), strides=1, activation="relu", padding="same")(x)
-    x = keras.layers.Conv2D(64, (4, 4), strides=2, activation="relu", padding="same")(
+    x = keras.layers.Conv2D(16 * mul_th, (4, 4), strides=2, activation="relu", padding="same")(x)
+    x = keras.layers.Conv2D(16 * mul_th, (4, 4), strides=2, activation="relu", padding="same")(x)
+    x = keras.layers.Conv2D(16 * mul_th, (3, 3), strides=1, activation="relu", padding="same")(x)
+    x = keras.layers.Conv2D(32 * mul_th, (4, 4), strides=2, activation="relu", padding="same")(x)
+    x = keras.layers.Conv2D(32 * mul_th, (3, 3), strides=1, activation="relu", padding="same")(x)
+    x = keras.layers.Conv2D(64 * mul_th, (4, 4), strides=2, activation="relu", padding="same")(
         x
     )
-    x = keras.layers.Conv2D(32, (3, 3), strides=1, activation="relu", padding="same")(x)
-    x = keras.layers.Conv2D(16, (3, 3), strides=1, activation="relu", padding="same")(x)
+    x = keras.layers.Conv2D(32 * mul_th, (3, 3), strides=1, activation="relu", padding="same")(x)
+    x = keras.layers.Conv2D(16 * mul_th, (3, 3), strides=1, activation="relu", padding="same")(x)
     encoded = keras.layers.Conv2D(1, (8, 8), strides=1, padding="same")(x)
 
     # Decode---------------------------------------------------------------------
-    x = keras.layers.Conv2D(16, (3, 3), strides=1, activation="relu", padding="same")(
+    x = keras.layers.Conv2D(16 * mul_th, (3, 3), strides=1, activation="relu", padding="same")(
         encoded
     )
-    x = keras.layers.Conv2D(32, (3, 3), strides=1, activation="relu", padding="same")(x)
+    x = keras.layers.Conv2D(32 * mul_th, (3, 3), strides=1, activation="relu", padding="same")(x)
     x = keras.layers.UpSampling2D((2, 2))(x)
-    x = keras.layers.Conv2D(64, (4, 4), strides=2, activation="relu", padding="same")(
+    x = keras.layers.Conv2D(64 * mul_th, (4, 4), strides=2, activation="relu", padding="same")(
         x
     )
     x = keras.layers.UpSampling2D((2, 2))(x)
-    x = keras.layers.Conv2D(32, (3, 3), strides=1, activation="relu", padding="same")(x)
+    x = keras.layers.Conv2D(32 * mul_th, (3, 3), strides=1, activation="relu", padding="same")(x)
     x = keras.layers.UpSampling2D((2, 2))(x)
-    x = keras.layers.Conv2D(32, (4, 4), strides=2, activation="relu", padding="same")(x)
+    x = keras.layers.Conv2D(32 * mul_th, (4, 4), strides=2, activation="relu", padding="same")(x)
     x = keras.layers.UpSampling2D((2, 2))(x)
-    x = keras.layers.Conv2D(16, (3, 3), strides=1, activation="relu", padding="same")(x)
+    x = keras.layers.Conv2D(16 * mul_th, (3, 3), strides=1, activation="relu", padding="same")(x)
     x = keras.layers.UpSampling2D((2, 2))(x)
-    x = keras.layers.Conv2D(16, (4, 4), strides=2, activation="relu", padding="same")(x)
+    x = keras.layers.Conv2D(16 * mul_th, (4, 4), strides=2, activation="relu", padding="same")(x)
     x = keras.layers.UpSampling2D((4, 4))(x)
-    x = keras.layers.Conv2D(16, (4, 4), strides=2, activation="relu", padding="same")(x)
+    x = keras.layers.Conv2D(16 * mul_th, (4, 4), strides=2, activation="relu", padding="same")(x)
     x = keras.layers.UpSampling2D((2, 2))(x)
-    x = keras.layers.Conv2D(16, (8, 8), activation="relu", padding="same")(x)
+    x = keras.layers.Conv2D(16 * mul_th, (8, 8), activation="relu", padding="same")(x)
 
     x = keras.layers.UpSampling2D((2, 2))(x)
     decoded = keras.layers.Conv2D(
